@@ -694,6 +694,10 @@ function compute_normal(x1, y1, z1, x2, y2, z2, x3, y3, z3)
   (Float32(nx/len), Float32(ny/len), Float32(nz/len))
 end
 
+function adaptive_segments(radius; min_seg=8, max_seg=64, target_arc=0.4)
+  clamp(2 * round(Int, π * abs(radius) / target_arc), min_seg, max_seg)
+end
+
 # ─── Geometry primitives ──────────────────────────────────────────────────────
 
 KhepriBase.b_trig(b::GL, p1, p2, p3, mat) =
@@ -955,18 +959,21 @@ KhepriBase.b_surface_polygon_with_holes(b::GL, ps, qss, mat) =
   b_surface_polygon(b, ps, mat)
 
 KhepriBase.b_surface_circle(b::GL, c, r, mat) =
-  b_surface_polygon(b, [c + vpol(r, θ, c.cs) for θ in range(0, 2π, length=33)[1:32]], mat)
+  let n = adaptive_segments(r)
+    b_surface_polygon(b, [c + vpol(r, θ, c.cs) for θ in range(0, 2π, length=n+1)[1:n]], mat)
+  end
 
 KhepriBase.b_surface_arc(b::GL, c, r, α, Δα, mat) =
-  let pts = [c + vpol(r, θ, c.cs) for θ in range(α, α + Δα, length=max(2, abs(round(Int, 32 * Δα / (2π))) + 1))]
+  let n = adaptive_segments(r),
+      pts = [c + vpol(r, θ, c.cs) for θ in range(α, α + Δα, length=max(2, abs(round(Int, n * Δα / (2π))) + 1))]
     b_surface_polygon(b, [c, pts...], mat)
   end
 
 # ─── Direct sphere with analytic normals ─────────────────────────────────────
 
 KhepriBase.b_sphere(b::GL, c, r, mat) =
-  let nlon = 32,
-      nlat = 16,
+  let nlon = adaptive_segments(r),
+      nlat = nlon ÷ 2,
       (cr, cg, cb, ca) = gl_color(mat),
       center = gl_xyz(c),
       # Precompute latitude rings: ring[j] has nlon vertices at polar angle ψ = j*π/nlat
@@ -1039,7 +1046,7 @@ KhepriBase.b_sphere(b::GL, c, r, mat) =
 # ─── Direct cone with analytic normals ───────────────────────────────────────
 
 KhepriBase.b_cone(b::GL, cb, r, h, mat) =
-  let n = 32,
+  let n = adaptive_segments(r),
       (cr, cg, cbl, ca) = gl_color(mat),
       base_c = gl_xyz(cb),
       apex = gl_xyz(add_z(cb, h)),
@@ -1227,7 +1234,7 @@ KhepriBase.b_regular_prism(b::GL, edges, cb, rb, angle, h, inscribed, mat) =
 # ─── Direct cone_frustum and cylinder with analytic normals ──────────────────
 
 KhepriBase.b_cone_frustum(b::GL, cb, rb, h, rt, mat) =
-  let n = 32,
+  let n = adaptive_segments(max(rb, rt)),
       (cr, cg, cbl, ca) = gl_color(mat),
       base_c = gl_xyz(cb),
       top_c = gl_xyz(add_z(cb, h)),
@@ -1294,8 +1301,8 @@ KhepriBase.b_cylinder(b::GL, cb, r, h, mat) =
 # ─── Direct torus with analytic normals ──────────────────────────────────────
 
 KhepriBase.b_torus(b::GL, c, ra, rb, mat) =
-  let ntor = 64,  # toroidal divisions (around the major circle)
-      npol = 32,  # poloidal divisions (around the tube cross-section)
+  let ntor = adaptive_segments(ra),  # toroidal divisions (around the major circle)
+      npol = adaptive_segments(rb),  # poloidal divisions (around the tube cross-section)
       (cr, cg, cb, ca) = gl_color(mat),
       center = gl_xyz(c),
       scene = b.scene,
