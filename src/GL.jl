@@ -694,7 +694,7 @@ function compute_normal(x1, y1, z1, x2, y2, z2, x3, y3, z3)
   (Float32(nx/len), Float32(ny/len), Float32(nz/len))
 end
 
-function adaptive_segments(radius; min_seg=8, max_seg=64, target_arc=0.4)
+function adaptive_segments(radius; min_seg=16, max_seg=64, target_arc=0.2)
   clamp(2 * round(Int, π * abs(radius) / target_arc), min_seg, max_seg)
 end
 
