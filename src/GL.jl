@@ -574,8 +574,8 @@ end
 # ─── Coordinate and color conversion ─────────────────────────────────────────
 
 gl_xyz(p) =
-  let p = in_world(p)
-    (Float32(p.x), Float32(p.y), Float32(p.z))
+  let r = world_raw(p)
+    (Float32(r[1]), Float32(r[2]), Float32(r[3]))
   end
 
 const GL_DEFAULT_COLOR = (0.6f0, 0.6f0, 0.6f0, 1.0f0)
