@@ -1387,36 +1387,27 @@ KhepriBase.b_cylinder(b::GL, cb, r, h, mat) =
 KhepriBase.b_torus(b::GL, c, ra, rb, mat) =
   let ntor = adaptive_segments(ra),  # toroidal divisions (around the major circle)
       npol = adaptive_segments(rb),  # poloidal divisions (around the tube cross-section)
-      (cr, cg, cb, ca) = gl_color(mat),
-      center = gl_xyz(c),
+      (cr, cg, cbl, ca) = gl_color(mat),
       scene = b.scene,
-      # Precompute all vertices and normals
-      # vertex[i,j] = point on torus at toroidal angle ϕ_i, poloidal angle ψ_j
-      # Normal = direction from tube center to vertex (analytic)
+      # Precompute tube centers and surface vertices using c's coordinate system
+      # so that the torus respects the frame of reference
       vertices = Matrix{NTuple{3,Float32}}(undef, ntor, npol),
       normals = Matrix{NTuple{3,Float32}}(undef, ntor, npol)
     for i in 1:ntor
       let ϕ = (i-1) * 2π / ntor,
-          cosϕ = Float32(cos(ϕ)),
-          sinϕ = Float32(sin(ϕ)),
-          # Center of tube cross-section at this toroidal angle
-          tcx = center[1] + Float32(ra) * cosϕ,
-          tcy = center[2] + Float32(ra) * sinϕ,
-          tcz = center[3]
+          tc = gl_xyz(add_pol(c, ra, ϕ))
         for j in 1:npol
           let ψ = (j-1) * 2π / npol,
-              cosψ = Float32(cos(ψ)),
-              sinψ = Float32(sin(ψ)),
-              # Point on the tube surface
-              x = tcx + Float32(rb) * cosψ * cosϕ,
-              y = tcy + Float32(rb) * cosψ * sinϕ,
-              z = tcz + Float32(rb) * sinψ,
-              # Normal: direction from tube center to point (analytic)
-              nx = cosψ * cosϕ,
-              ny = cosψ * sinϕ,
-              nz = sinψ
-            vertices[i,j] = (x, y, z)
-            normals[i,j] = (Float32(nx), Float32(ny), Float32(nz))
+              p = gl_xyz(add_sph(add_pol(c, ra, ϕ), rb, ϕ, ψ)),
+              # Normal: direction from tube center to surface point
+              dx = p[1] - tc[1],
+              dy = p[2] - tc[2],
+              dz = p[3] - tc[3],
+              len = sqrt(dx^2 + dy^2 + dz^2)
+            vertices[i,j] = p
+            normals[i,j] = len < 1f-10 ?
+              (0f0, 0f0, 1f0) :
+              (Float32(dx/len), Float32(dy/len), Float32(dz/len))
           end
         end
       end
@@ -1437,11 +1428,11 @@ KhepriBase.b_torus(b::GL, c, ra, rb, mat) =
             append_trig_vertices_smooth!(scene,
               p00..., p10..., p11...,
               n00..., n10..., n11...,
-              cr, cg, cb, ca)
+              cr, cg, cbl, ca)
             append_trig_vertices_smooth!(scene,
               p00..., p11..., p01...,
               n00..., n11..., n01...,
-              cr, cg, cb, ca)
+              cr, cg, cbl, ca)
           end
         end
       end
