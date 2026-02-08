@@ -1611,6 +1611,9 @@ KhepriBase.b_intersect_ref(b::GL, sref, mref) = sref
 KhepriBase.b_delete_ref(b::GL, r::GLId) =
   b.scene_dirty = true
 
+KhepriBase.b_all_shape_refs(b::GL) =
+  collect(Iterators.flatten(ref_values(b, r) for r in values(b.refs.shapes)))
+
 KhepriBase.b_delete_all_shape_refs(b::GL) =
   begin
     clear_scene!(b.scene)
