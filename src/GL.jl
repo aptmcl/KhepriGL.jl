@@ -49,13 +49,29 @@ PrimitiveBuffers() = PrimitiveBuffers(
   Vector{Float32}(undef, CHUNK_MAX_VERTICES * VERTEX_FLOATS),
   0, UInt32(0), UInt32(0), false)
 
+const MAX_LIGHTS = 16
+
+const LIGHT_POINT = Int32(0)
+const LIGHT_SPOT  = Int32(1)
+
+struct GLLight
+  type::Int32
+  position::NTuple{3,Float32}
+  direction::NTuple{3,Float32}
+  color::NTuple{3,Float32}
+  energy::Float32
+  hotspot::Float32
+  falloff::Float32
+end
+
 mutable struct GLScene
   tris::PrimitiveBuffers
   lines::PrimitiveBuffers
   points::PrimitiveBuffers
+  lights::Vector{GLLight}
 end
 
-GLScene() = GLScene(PrimitiveBuffers(), PrimitiveBuffers(), PrimitiveBuffers())
+GLScene() = GLScene(PrimitiveBuffers(), PrimitiveBuffers(), PrimitiveBuffers(), GLLight[])
 
 function flush_buffer!(pb::PrimitiveBuffers)
   pb.offset == 0 && return
@@ -81,6 +97,7 @@ function clear_scene!(s::GLScene)
   clear_primitive_buffers!(s.tris)
   clear_primitive_buffers!(s.lines)
   clear_primitive_buffers!(s.points)
+  empty!(s.lights)
   s
 end
 
@@ -193,31 +210,78 @@ in vec4 vColor;
 
 uniform vec3 uCameraPos;
 
+// Dynamic lights (when uLightCount == 0, fall back to hardcoded lighting)
+const int MAX_LIGHTS = 16;
+uniform int uLightCount;
+uniform int  uLightType[MAX_LIGHTS];    // 0 = point, 1 = spot
+uniform vec3 uLightPos[MAX_LIGHTS];
+uniform vec3 uLightDir[MAX_LIGHTS];
+uniform vec3 uLightColor[MAX_LIGHTS];
+uniform float uLightEnergy[MAX_LIGHTS];
+uniform float uLightHotspot[MAX_LIGHTS]; // spot inner cone half-angle (radians)
+uniform float uLightFalloff[MAX_LIGHTS]; // spot outer cone half-angle (radians)
+
 out vec4 FragColor;
 
 void main() {
   vec3 N = normalize(vWorldNormal);
   vec3 V = normalize(uCameraPos - vWorldPos);
 
-  // Hemisphere ambient: upper hemisphere brighter than lower
-  float hemisphereBlend = 0.5 + 0.5 * N.z;  // Z-up
-  float ambient = mix(0.08, 0.20, hemisphereBlend);
+  if (uLightCount == 0) {
+    // ── Hardcoded lighting (bit-for-bit identical to original) ──
+    float hemisphereBlend = 0.5 + 0.5 * N.z;
+    float ambient = mix(0.08, 0.20, hemisphereBlend);
 
-  // Key light: headlight from camera direction
-  vec3 L1 = V;
-  vec3 H1 = normalize(L1 + V);
-  float diff1 = max(dot(N, L1), 0.0) * 0.55;
-  float spec1 = pow(max(dot(N, H1), 0.0), 32.0) * 0.25;
+    vec3 L1 = V;
+    vec3 H1 = normalize(L1 + V);
+    float diff1 = max(dot(N, L1), 0.0) * 0.55;
+    float spec1 = pow(max(dot(N, H1), 0.0), 32.0) * 0.25;
 
-  // Fill light: fixed direction from below-left
-  vec3 L2 = normalize(vec3(-0.4, -0.3, -0.5));
-  float diff2 = max(dot(N, L2), 0.0) * 0.20;
+    vec3 L2 = normalize(vec3(-0.4, -0.3, -0.5));
+    float diff2 = max(dot(N, L2), 0.0) * 0.20;
 
-  // Two-sided lighting for key light
-  float diffBack = max(dot(-N, L1), 0.0) * 0.35;
+    float diffBack = max(dot(-N, L1), 0.0) * 0.35;
 
-  float lighting = ambient + max(diff1, diffBack) + diff2 + spec1;
-  FragColor = vec4(vColor.rgb * lighting, vColor.a);
+    float lighting = ambient + max(diff1, diffBack) + diff2 + spec1;
+    FragColor = vec4(vColor.rgb * lighting, vColor.a);
+  } else {
+    // ── Dynamic user-defined lighting ──
+    vec3 result = vec3(0.05) * vColor.rgb; // small ambient floor
+
+    for (int i = 0; i < uLightCount; i++) {
+      vec3 toLight = uLightPos[i] - vWorldPos;
+      float dist2 = dot(toLight, toLight);
+      float dist = sqrt(dist2);
+      vec3 L = toLight / max(dist, 0.0001);
+
+      // Inverse-square attenuation: energy / (4*pi*d^2)
+      float atten = uLightEnergy[i] / (12.566371 * max(dist2, 0.01));
+
+      // Spotlight angular falloff
+      if (uLightType[i] == 1) {
+        float cosAngle = dot(-L, normalize(uLightDir[i]));
+        float cosHotspot = cos(uLightHotspot[i]);
+        float cosFalloff = cos(uLightFalloff[i]);
+        atten *= smoothstep(cosFalloff, cosHotspot, cosAngle);
+      }
+
+      // Two-sided diffuse
+      float NdotL = dot(N, L);
+      float diffuse = max(NdotL, 0.0) + max(-NdotL, 0.0) * 0.5;
+
+      // Blinn-Phong specular
+      vec3 H = normalize(L + V);
+      float spec = pow(max(dot(N, H), 0.0), 32.0) * 0.3;
+
+      result += vColor.rgb * uLightColor[i] * atten * diffuse
+              + uLightColor[i] * atten * spec;
+    }
+
+    // Reinhard tone mapping
+    result = result / (result + vec3(1.0));
+
+    FragColor = vec4(result, vColor.a);
+  }
 }
 """
 
@@ -1539,6 +1603,29 @@ KhepriBase.b_delete_all_shape_refs(b::GL) =
     nothing
   end
 
+# ─── Lights ────────────────────────────────────────────────────────────────
+
+KhepriBase.b_pointlight(b::GL, loc, energy, color) =
+  let (x, y, z) = gl_xyz(loc),
+      c = gl_color(color)
+    push!(b.scene.lights, GLLight(
+      LIGHT_POINT, (x, y, z), (0f0, 0f0, -1f0),
+      (c[1], c[2], c[3]), Float32(energy), 0f0, 0f0))
+    next_ref!(b)
+  end
+
+KhepriBase.b_spotlight(b::GL, loc, dir, hotspot, falloff) =
+  let (x, y, z) = gl_xyz(loc),
+      (dx, dy, dz) = gl_xyz(dir)
+    push!(b.scene.lights, GLLight(
+      LIGHT_SPOT, (x, y, z), (dx, dy, dz),
+      (1f0, 1f0, 1f0), 1500f0, Float32(hotspot), Float32(falloff)))
+    next_ref!(b)
+  end
+
+KhepriBase.b_arealight(b::GL, loc, dir, size, energy, color) =
+  b_pointlight(b, loc, energy, color)
+
 function rebuild_scene!(b::GL)
   clear_scene!(b.scene)
   b.next_id = 1
@@ -1603,6 +1690,30 @@ function set_uniforms(program, model, view_mat, proj, cam_pos)
   loc >= 0 && glUniformMatrix4fv(loc, 1, GL_FALSE, proj)
   loc = glGetUniformLocation(program, "uCameraPos")
   loc >= 0 && glUniform3f(loc, cam_pos[1], cam_pos[2], cam_pos[3])
+end
+
+function set_light_uniforms(program, lights)
+  n = min(length(lights), MAX_LIGHTS)
+  loc = glGetUniformLocation(program, "uLightCount")
+  loc >= 0 && glUniform1i(loc, n)
+  for i in 1:n
+    light = lights[i]
+    idx = string(i - 1)
+    loc = glGetUniformLocation(program, "uLightType[$idx]")
+    loc >= 0 && glUniform1i(loc, light.type)
+    loc = glGetUniformLocation(program, "uLightPos[$idx]")
+    loc >= 0 && glUniform3f(loc, light.position...)
+    loc = glGetUniformLocation(program, "uLightDir[$idx]")
+    loc >= 0 && glUniform3f(loc, light.direction...)
+    loc = glGetUniformLocation(program, "uLightColor[$idx]")
+    loc >= 0 && glUniform3f(loc, light.color...)
+    loc = glGetUniformLocation(program, "uLightEnergy[$idx]")
+    loc >= 0 && glUniform1f(loc, light.energy)
+    loc = glGetUniformLocation(program, "uLightHotspot[$idx]")
+    loc >= 0 && glUniform1f(loc, light.hotspot)
+    loc = glGetUniformLocation(program, "uLightFalloff[$idx]")
+    loc >= 0 && glUniform1f(loc, light.falloff)
+  end
 end
 
 # ─── Render pipeline ─────────────────────────────────────────────────────────
@@ -1673,6 +1784,9 @@ function render_frame(b::GL)
                      b.shader_program
                    end
         set_uniforms(shader, mdl, view_mat, proj, cam_pos)
+        if shader == b.shader_program
+          set_light_uniforms(shader, b.scene.lights)
+        end
         draw_primitives(b.scene.tris, GL_TRIANGLES)
       end
 
