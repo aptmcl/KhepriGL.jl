@@ -3,6 +3,8 @@ export gl
 #=
 KhepriGL — Fast OpenGL backend for Khepri
 
+Coordinate convention: right-handed Z-up, same as Khepri. No axis transforms needed.
+
 Architecture: accumulate all geometry into flat buffers, upload to GPU in a
 single batch at render time. We implement only the lowest-level primitives
 (b_trig, b_quad, b_ngon, b_quad_strip, b_line, b_point); KhepriBase's
@@ -1603,6 +1605,7 @@ KhepriBase.b_delete_all_shapes_in_layer(b::GL, layer) = nothing
 # ─── Boolean operations (visual approximation) ──────────────────────────────
 # True CSG is not supported; both shapes are simply rendered.
 
+KhepriBase.b_unite_ref(b::GL, r0, r1) = r0
 KhepriBase.b_subtract_ref(b::GL, sref, mref) = sref
 KhepriBase.b_intersect_ref(b::GL, sref, mref) = sref
 
@@ -1610,9 +1613,6 @@ KhepriBase.b_intersect_ref(b::GL, sref, mref) = sref
 
 KhepriBase.b_delete_ref(b::GL, r::GLId) =
   b.scene_dirty = true
-
-KhepriBase.b_all_shape_refs(b::GL) =
-  collect(Iterators.flatten(ref_values(b, r) for r in values(b.refs.shapes)))
 
 KhepriBase.b_delete_all_shape_refs(b::GL) =
   begin
