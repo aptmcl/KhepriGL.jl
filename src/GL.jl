@@ -145,6 +145,9 @@ end
   # Last render_size applied to the window (to detect changes)
   applied_render_width::Int = 0
   applied_render_height::Int = 0
+
+  # Scene rebuild flag (set when shapes are deleted)
+  scene_dirty::Bool = false
 end
 
 const GL = GLBackend
@@ -1526,11 +1529,27 @@ KhepriBase.b_intersect_ref(b::GL, sref, mref) = sref
 
 # ─── Delete operations ───────────────────────────────────────────────────────
 
+KhepriBase.b_delete_ref(b::GL, r::GLId) =
+  b.scene_dirty = true
+
 KhepriBase.b_delete_all_shape_refs(b::GL) =
   begin
     clear_scene!(b.scene)
+    b.scene_dirty = false
     nothing
   end
+
+function rebuild_scene!(b::GL)
+  clear_scene!(b.scene)
+  b.next_id = 1
+  let shapes = collect(keys(shape_refs_storage(b)))
+    empty!(shape_refs_storage(b))
+    for s in shapes
+      force_realize(b, s)
+    end
+  end
+  b.scene_dirty = false
+end
 
 # ─── Connection lifecycle ─────────────────────────────────────────────────────
 
@@ -1588,12 +1607,15 @@ end
 
 # ─── Render pipeline ─────────────────────────────────────────────────────────
 
+lens_to_fov(lens) = 2 * 180 / π * atan(36 / (2 * lens))
+
 function compute_matrices(b::GL)
   let cam_pos = camera_position(b),
       target = b.cam_target,
+      fov = lens_to_fov(b.view.lens),
       aspect = Float32(b.width) / Float32(b.height),
       view_mat = look_at_matrix(cam_pos, target, [0.0, 0.0, 1.0]),
-      proj = perspective_matrix(45.0, aspect, 0.1, 10000.0),
+      proj = perspective_matrix(fov, aspect, 0.1, 10000.0),
       mdl = model_matrix()
     (mdl, view_mat, proj, Float32.(cam_pos))
   end
@@ -1614,6 +1636,7 @@ end
 
 function render_frame(b::GL)
   ensure_gpu(b)
+  b.scene_dirty && rebuild_scene!(b)
   upload_buffers(b)
 
   # Resize window if render_size changed
