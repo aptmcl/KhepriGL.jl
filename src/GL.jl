@@ -170,7 +170,7 @@ end
 const GL = GLBackend
 
 KhepriBase.backend_name(b::GL) = "GL"
-KhepriBase.void_ref(b::GL) = GLNativeRef(0)
+KhepriBase.void_ref(b::GL) = 0
 
 # Use frontend view management (stored in b.view)
 KhepriBase.view_type(::Type{GL}) = FrontendView()
@@ -662,7 +662,7 @@ gl_color(mat) =
 function next_ref!(b::GL)
   id = b.next_id
   b.next_id += 1
-  GLNativeRef(id)
+  id
 end
 
 function append_trig_vertices!(scene::GLScene, x1, y1, z1, x2, y2, z2, x3, y3, z3,
