@@ -660,7 +660,9 @@ gl_color(mat) =
 
 gl_line_color(mat) =
   let c = gl_color(mat)
-    c == GL_DEFAULT_COLOR ? GL_DEFAULT_LINE_COLOR : c
+    # Treat both the surface default (gray) and the layer default (white)
+    # as "no explicit color" and substitute black for lines/points/text.
+    c == GL_DEFAULT_COLOR || c == (1f0, 1f0, 1f0, 1f0) ? GL_DEFAULT_LINE_COLOR : c
   end
 
 # ─── Buffer append helpers ────────────────────────────────────────────────────
