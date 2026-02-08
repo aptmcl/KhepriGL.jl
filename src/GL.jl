@@ -580,9 +580,9 @@ function setup_callbacks(b::GL)
         b.cam_azimuth = 0.0
         b.cam_elevation = 0.0
       elseif key == GLFW.KEY_2
-        # Top view
-        b.cam_azimuth = 0.0
-        b.cam_elevation = π/2 - 0.01
+        # Top view: azimuth -π/2 so X→right, Y→up
+        b.cam_azimuth = -π/2
+        b.cam_elevation = π/2 - 0.001
       elseif key == GLFW.KEY_3
         # Perspective view (3/4)
         b.cam_azimuth = π/4
@@ -607,7 +607,13 @@ end
 
 function look_at_matrix(eye, target, up)
   f = normalize(target - eye)
-  s = normalize(cross(f, up))
+  s_raw = cross(f, up)
+  # If f is nearly parallel to up (top/bottom view), fall back to Y-forward as up
+  s = if norm(s_raw) < 1e-6
+    normalize(cross(f, [0.0, 1.0, 0.0]))
+  else
+    normalize(s_raw)
+  end
   u = cross(s, f)
   # Julia literals are row-major in appearance, stored column-major — matches OpenGL
   Float32[
@@ -1842,11 +1848,18 @@ function sync_camera_from_view(b::GL)
       dx = cam.x - tgt.x,
       dy = cam.y - tgt.y,
       dz = cam.z - tgt.z,
-      dist = sqrt(dx*dx + dy*dy + dz*dz)
+      dist = sqrt(dx*dx + dy*dy + dz*dz),
+      horiz = sqrt(dx*dx + dy*dy)
     b.cam_target .= [tgt.x, tgt.y, tgt.z]
     b.cam_distance = max(0.1, dist)
-    b.cam_azimuth = atan(dy, dx)
-    b.cam_elevation = asin(clamp(dz / max(dist, 1e-10), -1.0, 1.0))
+    if horiz < 1e-6
+      # Top/bottom view: azimuth is degenerate; set -π/2 so X→right, Y→up
+      b.cam_azimuth = -π/2
+      b.cam_elevation = dz >= 0 ? π/2 - 0.001 : -(π/2 - 0.001)
+    else
+      b.cam_azimuth = atan(dy, dx)
+      b.cam_elevation = asin(clamp(dz / max(dist, 1e-10), -1.0, 1.0))
+    end
   end
 end
 
@@ -2089,9 +2102,27 @@ KhepriBase.b_zoom_extents(b::GL) =
               dx = maximum(xs) - minimum(xs),
               dy = maximum(ys) - minimum(ys),
               dz = maximum(zs) - minimum(zs),
-              radius = sqrt(dx*dx + dy*dy + dz*dz) / 2
+              # Project bounding box extents onto the camera's view plane
+              az = b.cam_azimuth,
+              el = b.cam_elevation,
+              # Camera right vector (in world space)
+              rx = -sin(az), ry = cos(az),
+              # Camera up vector (in world space)
+              ux = -sin(el)*cos(az), uy = -sin(el)*sin(az), uz = cos(el),
+              # Half-extents of the bounding box
+              hx = dx/2, hy = dy/2, hz = dz/2,
+              # Project bounding box onto view plane (conservative: sum of abs projections)
+              view_half_w = abs(rx)*hx + abs(ry)*hy,
+              view_half_h = abs(ux)*hx + abs(uy)*hy + abs(uz)*hz,
+              # Account for aspect ratio
+              aspect = Float64(b.width) / max(1, Float64(b.height)),
+              fov = deg2rad(lens_to_fov(b.view.lens)) / 2,
+              # Distance to fit: max of horizontal and vertical requirements
+              dist_h = view_half_w / (tan(fov) * aspect),
+              dist_v = view_half_h / tan(fov),
+              dist = max(dist_h, dist_v) * 1.15  # 15% margin
             b.cam_target .= [cx, cy, cz]
-            b.cam_distance = max(0.1, radius * 2.5)
+            b.cam_distance = max(0.1, dist)
           end
         end
       end
@@ -2104,6 +2135,15 @@ KhepriBase.b_set_view(b::GL, camera, target, lens, aperture) =
     b.view.target = target
     b.view.lens = lens
     b.view.aperture = aperture
+    sync_camera_from_view(b)
+  end
+
+KhepriBase.b_set_view_top(b::GL) =
+  begin
+    b.view.camera = z(1000)
+    b.view.target = z(0)
+    b.view.lens = 1000
+    b.view.is_top_view = true
     sync_camera_from_view(b)
   end
 
