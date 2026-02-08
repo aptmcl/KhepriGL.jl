@@ -231,21 +231,23 @@ void main() {
   vec3 V = normalize(uCameraPos - vWorldPos);
 
   if (uLightCount == 0) {
-    // ── Hardcoded lighting (bit-for-bit identical to original) ──
+    // ── Hardcoded lighting (two-sided) ──
     float hemisphereBlend = 0.5 + 0.5 * N.z;
     float ambient = mix(0.08, 0.20, hemisphereBlend);
 
+    // Two-sided key light (camera-aligned)
     vec3 L1 = V;
     vec3 H1 = normalize(L1 + V);
-    float diff1 = max(dot(N, L1), 0.0) * 0.55;
+    float NdotL1 = dot(N, L1);
+    float diff1 = (max(NdotL1, 0.0) + max(-NdotL1, 0.0) * 0.5) * 0.55;
     float spec1 = pow(max(dot(N, H1), 0.0), 32.0) * 0.25;
 
+    // Two-sided rim/fill light
     vec3 L2 = normalize(vec3(-0.4, -0.3, -0.5));
-    float diff2 = max(dot(N, L2), 0.0) * 0.20;
+    float NdotL2 = dot(N, L2);
+    float diff2 = (max(NdotL2, 0.0) + max(-NdotL2, 0.0) * 0.5) * 0.20;
 
-    float diffBack = max(dot(-N, L1), 0.0) * 0.35;
-
-    float lighting = ambient + max(diff1, diffBack) + diff2 + spec1;
+    float lighting = ambient + diff1 + diff2 + spec1;
     FragColor = vec4(vColor.rgb * lighting, vColor.a);
   } else {
     // ── Dynamic user-defined lighting ──
@@ -1021,13 +1023,14 @@ KhepriBase.b_surface_polygon(b::GL, ps, mat) =
     elseif n == 3
       b_trig(b, ps[1], ps[2], ps[3], mat)
     else
-      # Fan triangulation from first vertex
+      # Ear clipping triangulation (handles concave polygons)
       let (r, g, bl, a) = gl_color(mat),
-          coords = [gl_xyz(p) for p in ps]
-        for i in 2:n-1
-          let (x1, y1, z1) = coords[1],
-              (x2, y2, z2) = coords[i],
-              (x3, y3, z3) = coords[i+1],
+          coords = [gl_xyz(p) for p in ps],
+          trigs = triangulate_polygon(coords)
+        for (i, j, k) in trigs
+          let (x1, y1, z1) = coords[i],
+              (x2, y2, z2) = coords[j],
+              (x3, y3, z3) = coords[k],
               (nx, ny, nz) = compute_normal(x1, y1, z1, x2, y2, z2, x3, y3, z3)
             append_trig_vertices!(b.scene, x1, y1, z1, x2, y2, z2, x3, y3, z3,
                                   nx, ny, nz, r, g, bl, a)
@@ -1561,12 +1564,14 @@ function emit_grid_flat!(scene, coords, nu, nv, closed_u, closed_v, r, g, bl, a)
 end
 
 KhepriBase.b_surface_grid(b::GL, ptss, closed_u, closed_v, smooth_u, smooth_v, mat) =
-  let ptss = maybe_interpolate_grid(ptss, smooth_u, smooth_v),
-      (nu, nv) = size(ptss),
+  # No grid interpolation: emit_grid_smooth! handles visual smoothing via
+  # per-vertex normal averaging, so upsampling is redundant for a GPU backend.
+  # Skipping maybe_interpolate_grid also avoids the unitized assertion error
+  # from near-zero spline derivatives in location_at.
+  let (nu, nv) = size(ptss),
       coords = [gl_xyz(ptss[i, j]) for i in 1:nu, j in 1:nv],
-      (r, g, bl, a) = gl_color(mat),
-      smooth = smooth_u || smooth_v
-    if smooth
+      (r, g, bl, a) = gl_color(mat)
+    if smooth_u || smooth_v
       emit_grid_smooth!(b.scene, coords, nu, nv, closed_u, closed_v, r, g, bl, a)
     else
       emit_grid_flat!(b.scene, coords, nu, nv, closed_u, closed_v, r, g, bl, a)
