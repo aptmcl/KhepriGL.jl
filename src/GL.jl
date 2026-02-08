@@ -165,6 +165,7 @@ end
 
   # Scene rebuild flag (set when shapes are deleted)
   scene_dirty::Bool = false
+
 end
 
 const GL = GLBackend
@@ -2135,6 +2136,7 @@ KhepriBase.b_set_view(b::GL, camera, target, lens, aperture) =
     b.view.target = target
     b.view.lens = lens
     b.view.aperture = aperture
+    b.view.is_top_view = false
     sync_camera_from_view(b)
   end
 
@@ -2146,6 +2148,15 @@ KhepriBase.b_set_view_top(b::GL) =
     b.view.is_top_view = true
     sync_camera_from_view(b)
   end
+
+# FrontendView dispatch safety net: if the generic b_set_view_top(b::T) where T<:Backend
+# routes through view_type(T) → FrontendView, these overrides ensure sync_camera_from_view
+# is still called, preventing stale orbital camera state.
+KhepriBase.b_set_view(::FrontendView, b::GL, camera, target, lens, aperture) =
+  KhepriBase.b_set_view(b, camera, target, lens, aperture)
+
+KhepriBase.b_set_view_top(::FrontendView, b::GL) =
+  KhepriBase.b_set_view_top(b)
 
 KhepriBase.b_get_view(b::GL) =
   (b.view.camera, b.view.target, b.view.lens)
