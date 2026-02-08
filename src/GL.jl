@@ -646,6 +646,7 @@ gl_xyz(p) =
   end
 
 const GL_DEFAULT_COLOR = (0.6f0, 0.6f0, 0.6f0, 1.0f0)
+const GL_DEFAULT_LINE_COLOR = (0.0f0, 0.0f0, 0.0f0, 1.0f0)
 
 gl_color(::Nothing) = GL_DEFAULT_COLOR
 gl_color(c::RGBA) = (Float32(c.r), Float32(c.g), Float32(c.b), Float32(c.alpha))
@@ -655,6 +656,11 @@ gl_color(mat) =
     gl_color(mat.base_color)
   else
     GL_DEFAULT_COLOR
+  end
+
+gl_line_color(mat) =
+  let c = gl_color(mat)
+    c == GL_DEFAULT_COLOR ? GL_DEFAULT_LINE_COLOR : c
   end
 
 # ─── Buffer append helpers ────────────────────────────────────────────────────
@@ -979,7 +985,7 @@ function append_point_vertex!(scene::GLScene, x, y, z, r, g, b, a)
 end
 
 KhepriBase.b_line(b::GL, ps, mat) =
-  let (r, g, bl, a) = gl_color(mat),
+  let (r, g, bl, a) = gl_line_color(mat),
       n = length(ps)
     for i in 1:n-1
       let (x1, y1, z1) = gl_xyz(ps[i]),
@@ -992,7 +998,7 @@ KhepriBase.b_line(b::GL, ps, mat) =
 
 KhepriBase.b_point(b::GL, p, mat) =
   let (x, y, z) = gl_xyz(p),
-      (r, g, bl, a) = gl_color(mat)
+      (r, g, bl, a) = gl_line_color(mat)
     append_point_vertex!(b.scene, x, y, z, r, g, bl, a)
     next_ref!(b)
   end
