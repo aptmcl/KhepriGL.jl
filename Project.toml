@@ -16,7 +16,7 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 [compat]
 ColorTypes = "0.11, 0.12"
 GLFW = "3"
-KhepriBase = "0.8"
+KhepriBase = "0.7"
 ModernGL = "1"
 PNGFiles = "0.4"
 Reexport = "1"
