@@ -1583,7 +1583,12 @@ KhepriBase.b_surface_grid(b::GL, ptss, closed_u, closed_v, smooth_u, smooth_v, m
 
 KhepriBase.b_new_material(b::GL, name, base_color, metallic, specular, roughness,
                           clearcoat, clearcoat_roughness, ior, transmission,
-                          transmission_roughness, emission_color, emission_strength) =
+                          transmission_roughness, emission_color, emission_strength,
+                          sheen_color, sheen_roughness,
+                          anisotropy, anisotropy_direction,
+                          ambient_occlusion, normal_map, bent_normal, clearcoat_normal,
+                          post_lighting_color,
+                          absorption, micro_thickness, thickness) =
   base_color
 
 KhepriBase.b_plastic_material(b::GL, name, color, roughness) = color
