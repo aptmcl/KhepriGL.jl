@@ -2,7 +2,7 @@
 
 julia_version = "1.12.3"
 manifest_format = "2.0"
-project_hash = "569c1fcc2029d1a67ef588e18a376d8de02d859c"
+project_hash = "9b4014f425ba6190340bfaca5a40e2d0870c85a8"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -211,9 +211,9 @@ version = "1.12.0"
 
 [[deps.KhepriBase]]
 deps = ["ColorTypes", "Dates", "Dierckx", "HTTP", "LinearAlgebra", "Sockets", "StaticArrays"]
-git-tree-sha1 = "002e31831c1b960a0a6b5c0003a97506189290bb"
+path = "../KhepriBase"
 uuid = "4cc0fe96-1163-46f3-ba32-de1e65d9548f"
-version = "0.6.2"
+version = "0.7.1"
 
 [[deps.KhepriGL]]
 deps = ["ColorTypes", "Dates", "GLFW", "KhepriBase", "LinearAlgebra", "ModernGL", "PNGFiles", "Reexport"]
