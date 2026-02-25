@@ -1645,6 +1645,15 @@ KhepriBase.b_spotlight(b::GL, loc, dir, hotspot, falloff) =
 KhepriBase.b_arealight(b::GL, loc, dir, size, energy, color) =
   b_pointlight(b, loc, energy, color)
 
+KhepriBase.b_ieslight(b::GL, file, loc, dir, alpha, beta, gamma) =
+  let (x, y, z) = gl_xyz(loc),
+      (dx, dy, dz) = gl_xyz(dir)
+    push!(b.scene.lights, GLLight(
+      LIGHT_SPOT, (x, y, z), (dx, dy, dz),
+      (1f0, 1f0, 1f0), 1500f0, Float32(pi/4), Float32(pi/3)))
+    next_ref!(b)
+  end
+
 function rebuild_scene!(b::GL)
   clear_scene!(b.scene)
   b.next_id = 1
