@@ -19,8 +19,17 @@ KhepriGL is a **local Julia backend** (not a socket or IO backend). It accumulat
 - **Multiple display modes**: `:shaded`, `:wireframe`, `:arctic`, `:xray`, `:shaded_wireframe`
 - **MSAA anti-aliasing**: Configurable sample count (0, 2, 4, or 8)
 - **Interactive camera**: Orbit and pan via mouse, with configurable azimuth/elevation/distance
-- **Dynamic lighting**: Up to 16 point or spot lights with inverse-square attenuation
+- **Dynamic lighting**: Up to 16 point, spot, IES, or area lights with inverse-square attenuation
 - **Two-sided shading**: Hardcoded fallback lighting when no user lights are defined
+
+## Lighting Support
+
+| Light Type | Implementation |
+|------------|---------------|
+| `pointlight` | Native `GLLight` (point type) |
+| `spotlight` | Native `GLLight` (spot type with hotspot/falloff) |
+| `ieslight` | Approximated as spotlight (45°/60° cone) |
+| `arealight` | Approximated as point light |
 
 ## Setup
 
