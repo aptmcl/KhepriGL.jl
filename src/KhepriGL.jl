@@ -26,7 +26,6 @@ function __init__()
   set_material(GLBackend, material_point,    rgba(1.0, 1.0, 1.0, 1))
   set_material(GLBackend, material_curve,    rgba(0.0, 0.0, 0.0, 1))
   set_material(GLBackend, material_surface,  rgba(0.6, 0.6, 0.6, 1))
-  open_view(gl)
 end
 
 end
