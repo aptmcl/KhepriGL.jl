@@ -13,13 +13,6 @@ defaults decompose all higher-level shapes down to these.
 
 # ─── Backend type definitions ─────────────────────────────────────────────────
 
-abstract type GLKey end
-const GLId = Int
-const GLIds = Vector{GLId}
-const GLRef = GenericRef{GLKey, GLId}
-const GLRefs = Vector{GLRef}
-const GLNativeRef = NativeRef{GLKey, GLId}
-
 # ─── Scene buffers (chunked, interleaved) ────────────────────────────────────
 # Interleaved vertex format: pos(3) + norm(3) + col(4) = 10 floats per vertex.
 # Fixed-size CPU buffers are filled, then flushed as GPU chunks (VBO+VAO).
@@ -105,34 +98,23 @@ end
 
 # ─── Backend struct ───────────────────────────────────────────────────────────
 
-@kwdef mutable struct GLBackend <: Backend{GLKey, GLId}
+@defbackend GL GL begin
+  id_type = Int
+  void_ref = 0
+  view_type = FrontendView()
+  mixin(render_state)
   shapes::Shapes = Shape[]
   current_layer::Union{Nothing, AbstractLayer} = nothing
   layers::Dict{AbstractLayer, Vector{Shape}} = Dict{AbstractLayer, Vector{Shape}}()
-  date::DateTime = DateTime(2020, 9, 21, 10, 0, 0)
-  place::GeographicLocation = GeographicLocation(39, 9, 0, 0)
-  render_env::RenderEnvironment = RealisticSkyEnvironment(5, true)
-  ground_level::Float64 = 0.0
-  ground_material::Union{Nothing, Material} = nothing
   view::View = default_view()
-  transaction::Parameter{KhepriBase.Transaction} = Parameter{KhepriBase.Transaction}(KhepriBase.AutoCommitTransaction())
-  refs::References{GLKey, GLId} = References{GLKey, GLId}()
   scene::GLScene = GLScene()
-  window::Any = nothing  # GLFW.Window or nothing
-
-  # GPU handles (initialized on first render)
-  # Per-primitive VAO/VBO resources are in PrimitiveBuffers (scene.tris/lines/points)
-  shader_program::UInt32 = 0
-  flat_shader_program::UInt32 = 0
-
+  window::Any = nothing
+  shader_program::UInt32 = UInt32(0)
+  flat_shader_program::UInt32 = UInt32(0)
   width::Int = 1024
   height::Int = 768
   initialized::Bool = false
-
-  # Next reference ID (monotonically increasing)
   next_id::Int = 1
-
-  # Interactive camera state
   orbit_active::Bool = false
   pan_active::Bool = false
   last_mouse_x::Float64 = 0.0
@@ -141,42 +123,17 @@ end
   cam_azimuth::Float64 = π/4
   cam_elevation::Float64 = π/6
   cam_target::Vector{Float64} = [0.0, 0.0, 0.0]
-
-  # Background render timer for interactive mode
-  render_timer::Any = nothing  # Timer or nothing
-
-  # Configurable background color (RGBA)
+  render_timer::Any = nothing
   background_color::NTuple{4,Float32} = (0.9f0, 0.9f0, 0.92f0, 1.0f0)
-
-  # Display mode: :shaded, :wireframe, :arctic, :xray, :shaded_wireframe
   display_mode::Symbol = :shaded
-
-  # GPU handles for additional shaders
-  arctic_shader_program::UInt32 = 0
-  xray_shader_program::UInt32 = 0
-
-  # MSAA anti-aliasing (0 = off, 2/4/8 = sample count)
+  arctic_shader_program::UInt32 = UInt32(0)
+  xray_shader_program::UInt32 = UInt32(0)
   msaa_samples::Int = 4
-
-  # Flag to trigger window recreation (e.g. after MSAA change)
   needs_restart::Bool = false
-
-  # Last render_size applied to the window (to detect changes)
   applied_render_width::Int = 0
   applied_render_height::Int = 0
-
-  # Scene rebuild flag (set when shapes are deleted)
   scene_dirty::Bool = false
-
 end
-
-const GL = GLBackend
-
-KhepriBase.backend_name(b::GL) = "GL"
-KhepriBase.void_ref(b::GL) = 0
-
-# Use frontend view management (stored in b.view)
-KhepriBase.view_type(::Type{GL}) = FrontendView()
 
 const gl = GL()
 

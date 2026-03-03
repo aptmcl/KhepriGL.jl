@@ -34,9 +34,9 @@ using Test
     @test b.initialized == false
     @test b.next_id == 1
     @test isnothing(b.window)
-    @test hasfield(typeof(b), :refs)
+    @test hasproperty(b, :refs)
     @test b.refs isa KhepriBase.References
-    @test hasfield(typeof(b), :view)
+    @test hasproperty(b, :view)
     @test b.view isa KhepriBase.View
     @test b.scene isa KhepriGL.GLScene
     @test b.background_color == (0.9f0, 0.9f0, 0.92f0, 1.0f0)
