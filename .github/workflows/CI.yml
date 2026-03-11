@@ -84,8 +84,11 @@ jobs:
           echo "DISPLAY=:99" >> $GITHUB_ENV
       - name: Use KhepriBase master (dev builds only)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        run: julia --color=yes --project=@. -e 'using Pkg; Pkg.develop(url="https://github.com/aptmcl/KhepriBase.jl")'
+        run: |
+          julia --color=yes --project=@. -e 'using Pkg; Pkg.develop(url="https://github.com/aptmcl/KhepriBase.jl")'
+          julia --color=yes --project=docs -e 'using Pkg; Pkg.develop(url="https://github.com/aptmcl/KhepriBase.jl"); Pkg.develop(path=pwd())'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-docdeploy@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPLAY: ':99'
