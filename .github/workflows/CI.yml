@@ -50,6 +50,12 @@ jobs:
             ${{ runner.os }}-test-${{ env.cache-name }}-
             ${{ runner.os }}-test-
             ${{ runner.os }}-
+      - name: Start virtual framebuffer (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+          Xvfb :99 -screen 0 1024x768x24 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
       - name: Use KhepriBase master (dev builds only)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: julia --color=yes --project=@. -e 'using Pkg; Pkg.develop(url="https://github.com/aptmcl/KhepriBase.jl")'
@@ -71,6 +77,11 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
+      - name: Start virtual framebuffer
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+          Xvfb :99 -screen 0 1024x768x24 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
       - name: Use KhepriBase master (dev builds only)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: julia --color=yes --project=@. -e 'using Pkg; Pkg.develop(url="https://github.com/aptmcl/KhepriBase.jl")'
