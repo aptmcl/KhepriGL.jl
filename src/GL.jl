@@ -359,9 +359,14 @@ end
 # ─── Window and OpenGL initialization ─────────────────────────────────────────
 
 raise_window(win) =
-  begin
-    GLFW.SetWindowAttrib(win, GLFW.FLOATING, true)
-    GLFW.SetWindowAttrib(win, GLFW.FLOATING, false)
+  try
+    GLFW.FocusWindow(win)
+  catch
+    try
+      GLFW.SetWindowAttrib(win, GLFW.FLOATING, true)
+      GLFW.SetWindowAttrib(win, GLFW.FLOATING, false)
+    catch
+    end
   end
 
 function ensure_window(b::GL)
@@ -401,7 +406,9 @@ function ensure_gpu(b::GL)
     glEnable(GL_MULTISAMPLE)
   end
   glPointSize(5.0)
-  glLineWidth(1.5)
+  if !Sys.isapple()
+    glLineWidth(1.5)
+  end
   glClearColor(b.background_color...)
 
   # Compile shaders
