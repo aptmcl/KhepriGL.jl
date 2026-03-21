@@ -1347,7 +1347,7 @@ KhepriBase.b_cone_frustum(b::GL, cb, rb, h, rt, mat) =
   end
 
 KhepriBase.b_cylinder(b::GL, cb, r, h, mat) =
-  KhepriBase.b_cone_frustum(b, cb, r, h, r, mat)
+  b_cone_frustum(b, cb, r, h, r, mat)
 
 # ─── Direct torus with analytic normals ──────────────────────────────────────
 
@@ -1545,14 +1545,7 @@ KhepriBase.b_surface_grid(b::GL, ptss, closed_u, closed_v, smooth_u, smooth_v, m
 
 # ─── Material handling ────────────────────────────────────────────────────────
 
-KhepriBase.b_new_material(b::GL, name, base_color, metallic, specular, roughness,
-                          clearcoat, clearcoat_roughness, ior, transmission,
-                          transmission_roughness, emission_color, emission_strength,
-                          sheen_color, sheen_roughness,
-                          anisotropy, anisotropy_direction,
-                          ambient_occlusion, normal_map, bent_normal, clearcoat_normal,
-                          post_lighting_color,
-                          absorption, micro_thickness, thickness) =
+KhepriBase.b_material(b::GL, name, base_color, metallic, roughness, specular) =
   base_color
 
 KhepriBase.b_plastic_material(b::GL, name, color, roughness) = color
@@ -2130,10 +2123,10 @@ KhepriBase.b_set_view_top(b::GL) =
 # routes through view_type(T) → FrontendView, these overrides ensure sync_camera_from_view
 # is still called, preventing stale orbital camera state.
 KhepriBase.b_set_view(::FrontendView, b::GL, camera, target, lens, aperture) =
-  KhepriBase.b_set_view(b, camera, target, lens, aperture)
+  b_set_view(b, camera, target, lens, aperture)
 
 KhepriBase.b_set_view_top(::FrontendView, b::GL) =
-  KhepriBase.b_set_view_top(b)
+  b_set_view_top(b)
 
 KhepriBase.b_get_view(b::GL) =
   (b.view.camera, b.view.target, b.view.lens)
